@@ -15,8 +15,10 @@ namespace StorageStation
 
     public static class Geometry
     {
+        private const string ResourceRoot = "StorageStation/Shapes/";
         private static readonly Dictionary<PrimitiveShape, Sprite> sprites = new Dictionary<PrimitiveShape, Sprite>();
 
+        // Used by the editor scene baker. Persistent scene objects keep their own SpriteRenderer references.
         public static SpriteRenderer Create(
             Transform parent,
             string name,
@@ -39,8 +41,16 @@ namespace StorageStation
 
         public static Sprite GetSprite(PrimitiveShape shape)
         {
-            if (sprites.TryGetValue(shape, out var cached)) return cached;
+            if (sprites.TryGetValue(shape, out var cached) && cached != null) return cached;
 
+            var persistent = Resources.Load<Sprite>(ResourceRoot + shape);
+            if (persistent != null)
+            {
+                sprites[shape] = persistent;
+                return persistent;
+            }
+
+            // Fallback for editor use before the primitive assets have been generated.
             const int resolution = 64;
             var texture = new Texture2D(resolution, resolution, TextureFormat.RGBA32, false);
             texture.name = shape + "Primitive";
@@ -72,11 +82,8 @@ namespace StorageStation
             }
             texture.SetPixels(pixels);
             texture.Apply();
-            var sprite = Sprite.Create(
-                texture,
-                new Rect(0f, 0f, resolution, resolution),
-                new Vector2(0.5f, 0.5f),
-                resolution);
+            var sprite = Sprite.Create(texture, new Rect(0f, 0f, resolution, resolution),
+                new Vector2(0.5f, 0.5f), resolution);
             sprite.name = shape + "Sprite";
             sprites[shape] = sprite;
             return sprite;

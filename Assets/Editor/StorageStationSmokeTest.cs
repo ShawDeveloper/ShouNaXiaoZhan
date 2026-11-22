@@ -23,8 +23,23 @@ namespace StorageStationEditor
         public static void RunBatch()
         {
             EditorSceneManager.OpenScene("Assets/Scenes/StorageStation.unity");
-            var tracking = GameObject.Find("Tracking");
-            if (tracking != null) tracking.SetActive(false);
+            var editLevel = UnityEngine.Object.FindAnyObjectByType<LevelController>();
+            Assert(editLevel != null, "编辑场景缺少 LevelController");
+            Assert(editLevel.transform.Find("World") != null, "World 未烘焙进场景");
+            Assert(editLevel.transform.Find("Items") != null && editLevel.transform.Find("Items").childCount == 6,
+                "六件物品未作为场景子对象保存");
+            Assert(editLevel.transform.Find("Targets") != null && editLevel.transform.Find("Targets").childCount == 5,
+                "目标凹槽未作为场景子对象保存");
+            Assert(GameObject.Find("GameCanvas") != null, "HUD Canvas 未烘焙进场景");
+            var sprites = editLevel.GetComponentsInChildren<SpriteRenderer>(true);
+            Assert(sprites.Length >= 60, "场景几何对象数量异常");
+            foreach (var sprite in sprites)
+            {
+                Assert(sprite.sprite != null && !string.IsNullOrEmpty(AssetDatabase.GetAssetPath(sprite.sprite)),
+                    "存在未持久化的 Sprite: " + sprite.name);
+            }
+            var tracking = UnityEngine.Object.FindAnyObjectByType<StorageHandLandmarkerRunner>();
+            if (tracking != null) tracking.gameObject.SetActive(false);
             var bootstrap = GameObject.Find("Bootstrap");
             if (bootstrap != null) bootstrap.SetActive(false);
             SessionState.SetBool(RunningKey, true);
@@ -65,7 +80,7 @@ namespace StorageStationEditor
                     Assert(level.State == LevelState.Playing, "调试输入未进入 Playing，当前状态 " + level.State);
                     var phone = level.Items.Find(item => item.Kind == ItemKind.Phone);
                     Assert(phone != null, "手机未创建");
-                    phone.BeltX = ConveyorController.InletX;
+                    phone.BeltX = level.Conveyor.InletX;
                     TickConveyor();
                     Assert(phone.State == ItemState.InTransit && !phone.gameObject.activeSelf, "手机进入传入口后未隐藏回收");
                     phone.EmitFromOutlet();

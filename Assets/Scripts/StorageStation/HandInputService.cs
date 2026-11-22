@@ -23,8 +23,16 @@ namespace StorageStation
     [DefaultExecutionOrder(-100)]
     public sealed class HandInputService : MonoBehaviour
     {
-        private StorageHandLandmarkerRunner runner;
-        private Camera gameCamera;
+        [Header("场景引用")]
+        [SerializeField] private StorageHandLandmarkerRunner runner;
+        [SerializeField] private Camera gameCamera;
+        [SerializeField] private HandCursorView leftCursor;
+        [SerializeField] private HandCursorView rightCursor;
+
+        [Header("追踪参数")]
+        [SerializeField, Range(1f, 40f)] private float positionSmoothing = 18f;
+        [SerializeField, Min(0.05f)] private float handTimeout = 0.25f;
+
         private float worldWidth;
         private float worldHeight;
         private bool debugMode;
@@ -34,21 +42,27 @@ namespace StorageStation
 
         public HandRuntimeState Left { get; } = new HandRuntimeState();
         public HandRuntimeState Right { get; } = new HandRuntimeState();
-        public HandCursorView LeftCursor { get; private set; }
-        public HandCursorView RightCursor { get; private set; }
+        public HandCursorView LeftCursor => leftCursor;
+        public HandCursorView RightCursor => rightCursor;
         public bool AnyHandValid => Left.Valid || Right.Valid;
         public bool BothHandsValid => Left.Valid && Right.Valid;
         public bool DebugMode => debugMode;
 
-        public void Initialize(StorageHandLandmarkerRunner handRunner, Camera camera)
+        public void Configure(StorageHandLandmarkerRunner handRunner, Camera camera,
+            HandCursorView left, HandCursorView right)
         {
             runner = handRunner;
             gameCamera = camera;
-            worldHeight = camera.orthographicSize * 2f;
-            worldWidth = worldHeight * 16f / 9f;
+            leftCursor = left;
+            rightCursor = right;
+        }
 
-            LeftCursor = CreateCursor(HandSide.Left);
-            RightCursor = CreateCursor(HandSide.Right);
+        public void Initialize(StorageHandLandmarkerRunner handRunner, Camera camera)
+        {
+            if (handRunner != null) runner = handRunner;
+            if (camera != null) gameCamera = camera;
+            worldHeight = gameCamera.orthographicSize * 2f;
+            worldWidth = worldHeight * gameCamera.aspect;
             Left.Valid = false;
             Right.Valid = false;
         }
@@ -77,6 +91,8 @@ namespace StorageStation
 
         private void Update()
         {
+            if (gameCamera == null || leftCursor == null || rightCursor == null) return;
+
             if (UnityEngine.Input.GetKeyDown(KeyCode.M))
             {
                 debugMode = !debugMode;
@@ -110,32 +126,18 @@ namespace StorageStation
                 if (Right.Valid) UpdateWave(Right);
             }
 
-            LeftCursor.SetState(Left.Position, Left.Angle, Left.Valid, progress[0], holding[0]);
-            RightCursor.SetState(Right.Position, Right.Angle, Right.Valid, progress[1], holding[1]);
-        }
-
-        private HandCursorView CreateCursor(HandSide side)
-        {
-            var go = new GameObject(side + "HandCursor");
-            go.transform.SetParent(transform, false);
-            var cursor = go.AddComponent<HandCursorView>();
-            cursor.Build(side);
-            return cursor;
+            leftCursor.SetState(Left.Position, Left.Angle, Left.Valid, progress[0], holding[0]);
+            rightCursor.SetState(Right.Position, Right.Angle, Right.Valid, progress[1], holding[1]);
         }
 
         private void ApplySample(HandSide side, HandSample sample, HandRuntimeState state)
         {
-            if (!sample.Valid)
-            {
-                return;
-            }
+            if (!sample.Valid) return;
 
-            var target = new Vector2(
-                (sample.Palm.x - 0.5f) * worldWidth,
-                (0.5f - sample.Palm.y) * worldHeight);
+            var target = new Vector2((sample.Palm.x - 0.5f) * worldWidth, (0.5f - sample.Palm.y) * worldHeight);
             var wasValid = state.Valid;
             state.Position = wasValid
-                ? Vector2.Lerp(state.Position, target, 1f - Mathf.Exp(-18f * Time.deltaTime))
+                ? Vector2.Lerp(state.Position, target, 1f - Mathf.Exp(-positionSmoothing * Time.deltaTime))
                 : target;
             state.Valid = true;
             state.LastSeen = Time.unscaledTime;
@@ -149,7 +151,7 @@ namespace StorageStation
 
         private void ExpireIfNeeded(HandRuntimeState state)
         {
-            if (state.Valid && Time.unscaledTime - state.LastSeen > 0.25f)
+            if (state.Valid && Time.unscaledTime - state.LastSeen > handTimeout)
             {
                 state.Valid = false;
                 state.History.Clear();

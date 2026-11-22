@@ -4,8 +4,8 @@ namespace StorageStation
 {
     public sealed class HandInteractionController : MonoBehaviour
     {
-        private const float HoverDuration = 2f;
-        private LevelController level;
+        [SerializeField, Min(0.1f)] private float hoverDuration = 2f;
+        [SerializeField] private LevelController level;
         private readonly InteractionState[] states = { new InteractionState(), new InteractionState() };
         private float mergeTime;
 
@@ -145,9 +145,9 @@ namespace StorageStation
             state.HoverTarget = null;
             state.HoverPuzzle = false;
             state.Timer += Time.deltaTime;
-            level.Input.SetProgress(side, state.Timer / HoverDuration);
+            level.Input.SetProgress(side, state.Timer / hoverDuration);
 
-            if (state.Timer >= HoverDuration)
+            if (state.Timer >= hoverDuration)
             {
                 PickUp(side, state, item);
             }
@@ -206,8 +206,8 @@ namespace StorageStation
             }
 
             state.Timer += Time.deltaTime;
-            level.Input.SetProgress(side, state.Timer / HoverDuration);
-            if (state.Timer < HoverDuration) return;
+            level.Input.SetProgress(side, state.Timer / hoverDuration);
+            if (state.Timer < hoverDuration) return;
 
             if (target.CanAccept(item))
             {
@@ -234,8 +234,8 @@ namespace StorageStation
                 state.Timer = 0f;
             }
             state.Timer += Time.deltaTime;
-            level.Input.SetProgress(side, state.Timer / HoverDuration);
-            if (state.Timer < HoverDuration) return;
+            level.Input.SetProgress(side, state.Timer / hoverDuration);
+            if (state.Timer < hoverDuration) return;
 
             state.Held = null;
             var reason = item.IsFragment ? "左右碎片位置不匹配" : "这里需要双手碎片";
@@ -263,12 +263,12 @@ namespace StorageStation
             if (bothReady)
             {
                 mergeTime += Time.deltaTime;
-                var progress = mergeTime / HoverDuration;
+                var progress = mergeTime / hoverDuration;
                 level.Input.SetProgress(HandSide.Left, progress);
                 level.Input.SetProgress(HandSide.Right, progress);
                 level.Puzzle.SetProgress(progress);
 
-                if (mergeTime >= HoverDuration)
+                if (mergeTime >= hoverDuration)
                 {
                     var leftItem = left.Held;
                     var rightItem = right.Held;

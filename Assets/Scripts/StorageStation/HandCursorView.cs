@@ -4,18 +4,25 @@ using UnityEngine.UI;
 
 namespace StorageStation
 {
+    [SelectionBase]
     public sealed class HandCursorView : MonoBehaviour
     {
-        private readonly List<SpriteRenderer> coloredParts = new List<SpriteRenderer>();
-        private Transform gloveVisual;
-        private Image progressImage;
-        private Color handColor;
+        [Header("手套配置")]
+        [SerializeField] private HandSide side;
+        [SerializeField] private Color handColor = Color.white;
 
-        public void Build(HandSide side)
+        [Header("场景引用")]
+        [SerializeField] private Transform gloveVisual;
+        [SerializeField] private Image progressImage;
+        [SerializeField] private List<SpriteRenderer> coloredParts = new List<SpriteRenderer>();
+
+        public void Build(HandSide handSide)
         {
+            side = handSide;
             handColor = side == HandSide.Left
                 ? new Color(0.15f, 0.72f, 0.95f)
                 : new Color(0.98f, 0.45f, 0.62f);
+            coloredParts.Clear();
 
             gloveVisual = new GameObject(side + "GloveVisual").transform;
             gloveVisual.SetParent(transform, false);
@@ -71,14 +78,23 @@ namespace StorageStation
         public void SetState(Vector2 position, float angle, bool valid, float progress, bool holding)
         {
             gameObject.SetActive(valid);
-            if (!valid) return;
+            if (!valid || gloveVisual == null || progressImage == null) return;
             transform.position = position;
             gloveVisual.localRotation = Quaternion.Euler(0f, 0f, angle);
             progressImage.fillAmount = Mathf.Clamp01(progress);
             progressImage.enabled = progress > 0.001f;
             foreach (var part in coloredParts)
             {
-                part.color = holding ? new Color(1f, 0.78f, 0.22f) : handColor;
+                if (part != null) part.color = holding ? new Color(1f, 0.78f, 0.22f) : handColor;
+            }
+        }
+
+        private void OnValidate()
+        {
+            if (Application.isPlaying) return;
+            foreach (var part in coloredParts)
+            {
+                if (part != null) part.color = handColor;
             }
         }
     }

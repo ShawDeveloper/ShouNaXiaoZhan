@@ -6,28 +6,30 @@ namespace StorageStation
     [DefaultExecutionOrder(100)]
     public sealed class GameHud : MonoBehaviour
     {
-        private LevelController level;
-        private Text progressText;
-        private Text puzzleText;
-        private Text trackingText;
-        private Text messageText;
-        private Text catText;
-        private Text leftHint;
-        private Text rightHint;
-        private GameObject panel;
-        private Text panelTitle;
-        private Text panelDetail;
-        private Text panelButtonText;
-        private Button panelButton;
-        private Font font;
+        [Header("场景引用")]
+        [SerializeField] private LevelController level;
+        [SerializeField] private Font font;
+        [SerializeField] private Text progressText;
+        [SerializeField] private Text puzzleText;
+        [SerializeField] private Text trackingText;
+        [SerializeField] private Text messageText;
+        [SerializeField] private Text catText;
+        [SerializeField] private Text leftHint;
+        [SerializeField] private Text rightHint;
+        [SerializeField] private GameObject panel;
+        [SerializeField] private Text panelTitle;
+        [SerializeField] private Text panelDetail;
+        [SerializeField] private Text panelButtonText;
+        [SerializeField] private Button panelButton;
+
         private float messageUntil;
         private readonly float[] hintUntil = new float[2];
 
-        public void Initialize(LevelController owner)
+        // Called by the editor baker. Every Canvas, Text, Image and Button is saved in the scene.
+        public void BuildVisual(LevelController owner)
         {
             level = owner;
-            font = Font.CreateDynamicFontFromOSFont("Microsoft YaHei", 28);
-            if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             var canvasObject = new GameObject("GameCanvas");
             canvasObject.transform.SetParent(transform, false);
@@ -61,15 +63,23 @@ namespace StorageStation
             BuildPanel(canvasObject.transform);
         }
 
+        public void Initialize(LevelController owner)
+        {
+            if (owner != null) level = owner;
+            var runtimeFont = Font.CreateDynamicFontFromOSFont("Microsoft YaHei", 28);
+            if (runtimeFont == null) return;
+            foreach (var text in GetComponentsInChildren<Text>(true)) text.font = runtimeFont;
+        }
+
         private void Update()
         {
-            if (level == null) return;
+            if (level == null || progressText == null) return;
             var placed = 0;
             foreach (var item in level.Items)
             {
                 if (item.IsPlaced) placed++;
             }
-            progressText.text = "已收纳 " + placed + "/6";
+            progressText.text = "已收纳 " + placed + "/" + level.Items.Count;
             puzzleText.text = "双手拼合 " + (level.Puzzle == null ? 0 : level.Puzzle.IsComplete ? 2 : 0) + "/2";
 
             if (level.Input != null && level.Input.DebugMode)
@@ -104,7 +114,7 @@ namespace StorageStation
 
         public void SetCatWarning(string text)
         {
-            catText.text = text;
+            if (catText != null) catText.text = text;
         }
 
         public void ShowWon()
@@ -129,7 +139,7 @@ namespace StorageStation
 
         public void HidePanel()
         {
-            panel.SetActive(false);
+            if (panel != null) panel.SetActive(false);
         }
 
         private void BuildPanel(Transform parent)

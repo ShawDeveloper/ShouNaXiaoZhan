@@ -3,22 +3,33 @@ using UnityEngine;
 
 namespace StorageStation
 {
+    [SelectionBase]
     public sealed class DropTarget : MonoBehaviour
     {
-        private SpriteRenderer zoneRenderer;
-        private Color baseColor;
+        [Header("目标配置")]
+        [SerializeField] private string acceptedItemId;
+        [SerializeField] private ItemKind itemKind;
+        [SerializeField] private Vector2 size = new Vector2(3f, 3f);
+        [SerializeField] private Color baseColor = Color.white;
+
+        [Header("场景引用")]
+        [SerializeField] private SpriteRenderer zoneRenderer;
+
+        private StorageItem occupant;
+        private Vector3 initialScale;
         private Coroutine flashRoutine;
 
-        public string AcceptedItemId { get; private set; }
-        public StorageItem Occupant { get; private set; }
-        public Vector2 Size { get; private set; }
+        public string AcceptedItemId => acceptedItemId;
+        public StorageItem Occupant => occupant;
+        public Vector2 Size => size;
         public Vector2 PlacementPosition => transform.position;
 
-        public void Initialize(string acceptedItemId, Vector2 size, Color color, ItemKind itemKind)
+        public void Configure(string id, Vector2 dimensions, Color color, ItemKind targetKind)
         {
-            AcceptedItemId = acceptedItemId;
-            Size = size;
+            acceptedItemId = id;
+            size = dimensions;
             baseColor = color;
+            itemKind = targetKind;
             zoneRenderer = Geometry.Create(transform, "TargetZone", PrimitiveShape.Square, Vector2.zero,
                 size, color, 2);
 
@@ -40,20 +51,27 @@ namespace StorageStation
             }
         }
 
+        public void InitializeRuntime()
+        {
+            initialScale = transform.localScale;
+            occupant = null;
+            if (zoneRenderer != null) zoneRenderer.color = baseColor;
+        }
+
         public bool Contains(Vector2 point)
         {
-            var delta = point - (Vector2)transform.position;
-            return Mathf.Abs(delta.x) <= Size.x * 0.5f && Mathf.Abs(delta.y) <= Size.y * 0.5f;
+            var local = transform.InverseTransformPoint(point);
+            return Mathf.Abs(local.x) <= size.x * 0.5f && Mathf.Abs(local.y) <= size.y * 0.5f;
         }
 
         public bool CanAccept(StorageItem item)
         {
-            return item.ItemId == AcceptedItemId && (Occupant == null || Occupant == item);
+            return item.ItemId == acceptedItemId && (occupant == null || occupant == item);
         }
 
         public void Place(StorageItem item)
         {
-            Occupant = item;
+            occupant = item;
             item.CurrentDropTarget = this;
             item.CurrentPuzzleTarget = null;
             item.PlaceAt(PlacementPosition);
@@ -62,33 +80,49 @@ namespace StorageStation
 
         public void Remove(StorageItem item)
         {
-            if (Occupant == item) Occupant = null;
+            if (occupant == item) occupant = null;
             if (item.CurrentDropTarget == this) item.CurrentDropTarget = null;
         }
 
         public void Flash(Color color)
         {
-            if (!isActiveAndEnabled) return;
+            if (!isActiveAndEnabled || zoneRenderer == null) return;
             if (flashRoutine != null) StopCoroutine(flashRoutine);
             flashRoutine = StartCoroutine(FlashRoutine(color));
         }
 
         public void ResetTarget()
         {
-            Occupant = null;
+            occupant = null;
             if (flashRoutine != null) StopCoroutine(flashRoutine);
-            zoneRenderer.color = baseColor;
-            transform.localScale = Vector3.one;
+            if (zoneRenderer != null) zoneRenderer.color = baseColor;
+            transform.localScale = initialScale;
         }
 
         private IEnumerator FlashRoutine(Color color)
         {
             zoneRenderer.color = color;
-            transform.localScale = Vector3.one * 1.035f;
+            transform.localScale = initialScale * 1.035f;
             yield return new WaitForSeconds(0.22f);
             zoneRenderer.color = baseColor;
-            transform.localScale = Vector3.one;
+            transform.localScale = initialScale;
             flashRoutine = null;
+        }
+
+        private void OnValidate()
+        {
+            size = new Vector2(Mathf.Max(0.1f, size.x), Mathf.Max(0.1f, size.y));
+            if (Application.isPlaying || zoneRenderer == null) return;
+            zoneRenderer.transform.localScale = new Vector3(size.x, size.y, 1f);
+            zoneRenderer.color = baseColor;
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            Gizmos.matrix = transform.localToWorldMatrix;
+            Gizmos.color = new Color(baseColor.r, baseColor.g, baseColor.b, 0.8f);
+            Gizmos.DrawWireCube(Vector3.zero, new Vector3(size.x, size.y, 0.05f));
+            Gizmos.matrix = Matrix4x4.identity;
         }
     }
 }

@@ -69,11 +69,12 @@ namespace StorageStationEditor
             bootstrapInstance.name = "Bootstrap";
 
             var gameRoot = new GameObject("GameRoot");
-            gameRoot.AddComponent<LevelController>();
+            var level = gameRoot.AddComponent<LevelController>();
 
             var tracking = new GameObject("Tracking");
             tracking.AddComponent<StorageHandLandmarkerRunner>();
 
+            StorageStationSceneBaker.Bake(level);
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
             AssetDatabase.SaveAssets();

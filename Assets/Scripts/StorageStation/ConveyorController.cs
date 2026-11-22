@@ -5,19 +5,26 @@ namespace StorageStation
     [DefaultExecutionOrder(-20)]
     public sealed class ConveyorController : MonoBehaviour
     {
-        public const float BeltY = -3.85f;
-        public const float OutletX = -8.0f;
-        public const float InletX = 8.0f;
-        private const float InitialMinX = -7.4f;
-        private const float Spacing = 2.6f;
-        private const float Speed = 0.6f;
-        private const float RecycleDelay = 3f;
+        [Header("轨道布局")]
+        [SerializeField] private float beltY = -3.85f;
+        [SerializeField] private float outletX = -8.0f;
+        [SerializeField] private float inletX = 8.0f;
+        [SerializeField] private float initialMinX = -7.4f;
+        [SerializeField] private float spacing = 2.6f;
 
-        private LevelController level;
+        [Header("运行参数")]
+        [SerializeField, Min(0f)] private float speed = 0.6f;
+        [SerializeField, Min(0f)] private float recycleDelay = 3f;
+        [SerializeField] private LevelController level;
+
+        public float BeltY => beltY;
+        public float OutletX => outletX;
+        public float InletX => inletX;
+        public float RecycleDelay => recycleDelay;
 
         public void Initialize(LevelController owner)
         {
-            level = owner;
+            if (owner != null) level = owner;
         }
 
         private void Update()
@@ -34,28 +41,33 @@ namespace StorageStation
                 }
 
                 if (item.State != ItemState.OnBelt) continue;
-                if (advance) item.BeltX += Speed * Time.deltaTime;
-                item.transform.position = new Vector2(item.BeltX, BeltY);
-                if (item.BeltX >= InletX)
-                {
-                    item.BeginTransit(RecycleDelay);
-                }
+                if (advance) item.BeltX += speed * Time.deltaTime;
+                item.transform.position = new Vector2(item.BeltX, item.BeltY);
+                if (item.BeltX >= inletX) item.BeginTransit(recycleDelay);
             }
         }
 
         public float GetInitialBeltX(int index)
         {
-            return InitialMinX + index * Spacing;
+            return initialMinX + index * spacing;
         }
 
         public Vector2 GetOutletPosition(StorageItem item)
         {
-            return new Vector2(OutletX - item.BeltIndex * 0.16f, BeltY);
+            return new Vector2(outletX - item.BeltIndex * 0.16f, item.BeltY);
         }
 
         public void ResetConveyor()
         {
-            // Item reset assigns the initial positions. Kept as the single reset entry point.
+            // Items restore their authored scene positions in ResetImmediate.
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            Gizmos.color = new Color(0.2f, 0.75f, 0.9f, 0.8f);
+            Gizmos.DrawLine(new Vector3(outletX, beltY, 0f), new Vector3(inletX, beltY, 0f));
+            Gizmos.DrawWireSphere(new Vector3(outletX, beltY, 0f), 0.18f);
+            Gizmos.DrawWireSphere(new Vector3(inletX, beltY, 0f), 0.18f);
         }
     }
 }

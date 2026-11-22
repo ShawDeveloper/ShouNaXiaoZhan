@@ -21,42 +21,50 @@ namespace StorageStation
         RightFragment
     }
 
+    [SelectionBase]
     public sealed class StorageItem : MonoBehaviour
     {
-        private LevelController level;
+        [Header("物品配置")]
+        [SerializeField] private string itemId;
+        [SerializeField] private string displayName;
+        [SerializeField] private ItemKind kind;
+        [SerializeField] private Color baseColor = Color.white;
+        [SerializeField, Min(0.1f)] private float pickRadius = 0.95f;
+
+        [Header("传送带配置")]
+        [SerializeField] private int beltIndex;
+        [SerializeField] private LevelController level;
+
         private Vector2 returnStart;
+        private Vector2 initialPosition;
+        private Vector3 initialScale;
         private float returnTime;
         private const float ReturnDuration = 0.38f;
 
-        public string ItemId { get; private set; }
-        public string DisplayName { get; private set; }
-        public ItemKind Kind { get; private set; }
+        public string ItemId => itemId;
+        public string DisplayName => displayName;
+        public ItemKind Kind => kind;
         public ItemState State { get; private set; }
-        public int BeltIndex { get; private set; }
+        public int BeltIndex => beltIndex;
         public float BeltX { get; set; }
+        public float BeltY { get; private set; }
         public float RecycleAt { get; private set; }
         public HandSide? HeldBy { get; private set; }
         public DropTarget CurrentDropTarget { get; set; }
         public PuzzleTarget CurrentPuzzleTarget { get; set; }
-        public Color BaseColor { get; private set; }
-        public bool IsFragment => Kind == ItemKind.LeftFragment || Kind == ItemKind.RightFragment;
+        public Color BaseColor => baseColor;
+        public bool IsFragment => kind == ItemKind.LeftFragment || kind == ItemKind.RightFragment;
         public bool IsPlaced => State == ItemState.Placed;
 
-        public void Initialize(
-            LevelController owner,
-            string id,
-            string displayName,
-            ItemKind kind,
-            Color color,
-            int beltIndex)
+        // Editor scene-baking entry. All child shapes are saved as real scene GameObjects.
+        public void Configure(string id, string label, ItemKind itemKind, Color color, int index, Vector2 position)
         {
-            level = owner;
-            ItemId = id;
-            DisplayName = displayName;
-            Kind = kind;
-            BaseColor = color;
-            BeltIndex = beltIndex;
-            State = ItemState.OnBelt;
+            itemId = id;
+            displayName = label;
+            kind = itemKind;
+            baseColor = color;
+            beltIndex = index;
+            transform.position = position;
 
             if (kind == ItemKind.Bag)
             {
@@ -86,21 +94,27 @@ namespace StorageStation
                 Geometry.Create(transform, "Fragment", shape, Vector2.zero,
                     new Vector2(1.22f, 1.72f), color, 22);
             }
+        }
 
-            BeltX = level.Conveyor.GetInitialBeltX(beltIndex);
-            transform.position = new Vector2(BeltX, ConveyorController.BeltY);
+        public void InitializeRuntime(LevelController owner)
+        {
+            level = owner;
+            initialPosition = transform.position;
+            initialScale = transform.localScale;
+            BeltX = initialPosition.x;
+            BeltY = initialPosition.y;
+            State = ItemState.OnBelt;
         }
 
         public bool Contains(Vector2 point)
         {
-            var local = (Vector2)transform.position - point;
-            return local.sqrMagnitude <= 0.95f * 0.95f;
+            return ((Vector2)transform.position - point).sqrMagnitude <= pickRadius * pickRadius;
         }
 
         public bool CanBePickedBy(HandSide side)
         {
-            if (Kind == ItemKind.LeftFragment) return side == HandSide.Left;
-            if (Kind == ItemKind.RightFragment) return side == HandSide.Right;
+            if (kind == ItemKind.LeftFragment) return side == HandSide.Left;
+            if (kind == ItemKind.RightFragment) return side == HandSide.Right;
             return true;
         }
 
@@ -118,7 +132,7 @@ namespace StorageStation
             HeldBy = null;
             State = ItemState.Placed;
             transform.position = position;
-            transform.localScale = Vector3.one;
+            transform.localScale = initialScale;
             transform.rotation = Quaternion.identity;
         }
 
@@ -140,7 +154,7 @@ namespace StorageStation
             HeldBy = null;
             returnStart = transform.position;
             returnTime = 0f;
-            transform.localScale = Vector3.one;
+            transform.localScale = initialScale;
             transform.rotation = Quaternion.identity;
             State = ItemState.Returning;
         }
@@ -160,9 +174,9 @@ namespace StorageStation
             gameObject.SetActive(true);
             State = ItemState.OnBelt;
             BeltX = level.Conveyor.GetOutletPosition(this).x;
-            transform.localScale = Vector3.one;
+            transform.localScale = initialScale;
             transform.rotation = Quaternion.identity;
-            transform.position = new Vector2(BeltX, ConveyorController.BeltY);
+            transform.position = new Vector2(BeltX, BeltY);
         }
 
         public void SetCatStolen()
@@ -182,10 +196,10 @@ namespace StorageStation
             CurrentPuzzleTarget = null;
             HeldBy = null;
             State = ItemState.OnBelt;
-            transform.localScale = Vector3.one;
+            transform.localScale = initialScale;
             transform.rotation = Quaternion.identity;
-            BeltX = level.Conveyor.GetInitialBeltX(BeltIndex);
-            transform.position = new Vector2(BeltX, ConveyorController.BeltY);
+            transform.position = initialPosition;
+            BeltX = initialPosition.x;
         }
 
         public void UpdateItem()
@@ -201,6 +215,12 @@ namespace StorageStation
                 State = ItemState.OnBelt;
                 BeltX = destination.x;
             }
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            Gizmos.color = new Color(baseColor.r, baseColor.g, baseColor.b, 0.65f);
+            Gizmos.DrawWireSphere(transform.position, pickRadius);
         }
     }
 }

@@ -7,12 +7,17 @@ namespace StorageStation
     {
         private static readonly Color SuccessColor = new Color(0.12f, 0.65f, 0.35f);
         private static readonly Color ErrorColor = new Color(0.88f, 0.16f, 0.2f);
-        private GameHud hud;
+
+        [SerializeField] private GameHud hud;
+        [SerializeField, Min(0.1f)] private float normalDropDuration = 0.55f;
+        [SerializeField, Min(0.1f)] private float offscreenDropDuration = 0.75f;
+        [SerializeField] private float offscreenY = -7.2f;
+
         private readonly float[] nextHintTime = new float[2];
 
         public void Initialize(GameHud gameHud)
         {
-            hud = gameHud;
+            if (gameHud != null) hud = gameHud;
         }
 
         public void Correct(HandSide side, StorageItem item, DropTarget target)
@@ -76,14 +81,13 @@ namespace StorageStation
         private IEnumerator DropOffscreenAndRecycle(StorageItem item)
         {
             var start = (Vector2)item.transform.position;
-            const float duration = 0.75f;
             var time = 0f;
-            while (time < duration && item.State == ItemState.Dropping)
+            while (time < offscreenDropDuration && item.State == ItemState.Dropping)
             {
                 time += Time.deltaTime;
-                var t = Mathf.Clamp01(time / duration);
+                var t = Mathf.Clamp01(time / offscreenDropDuration);
                 var x = Mathf.Lerp(start.x, start.x + 0.35f, t);
-                var y = Mathf.Lerp(start.y, -7.2f, t * t);
+                var y = Mathf.Lerp(start.y, offscreenY, t * t);
                 item.transform.position = new Vector2(x, y);
                 item.transform.localScale = Vector3.one * Mathf.Lerp(1f, 0.75f, t);
                 yield return null;
@@ -94,12 +98,11 @@ namespace StorageStation
         private IEnumerator DropAndReturn(StorageItem item)
         {
             var start = (Vector2)item.transform.position;
-            const float duration = 0.55f;
             var time = 0f;
-            while (time < duration && item.State == ItemState.Dropping)
+            while (time < normalDropDuration && item.State == ItemState.Dropping)
             {
                 time += Time.deltaTime;
-                var t = Mathf.Clamp01(time / duration);
+                var t = Mathf.Clamp01(time / normalDropDuration);
                 var x = start.x + Mathf.Sin(t * Mathf.PI) * 0.22f;
                 var y = start.y - 1.45f * t * t;
                 item.transform.position = new Vector2(x, y);
